@@ -2,6 +2,7 @@ package com.wojtek.butrym.servicewithreceiver;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -9,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -16,8 +18,14 @@ import android.telephony.SmsManager;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.sql.Time;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class LocationService extends Service implements LocationListener {
     double latitude;
@@ -36,13 +44,10 @@ public class LocationService extends Service implements LocationListener {
     public void onCreate() {
         context = getApplicationContext();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            //Log.e("service", "sprawdzam uprawnienia");
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                //Log.e("service", "żądam uprawnienien");
                 Intent permissionintent = new Intent(context, MainActivity.class);
                 permissionintent.putExtra("uprawnienia", "location");
                 startActivity(permissionintent);
-                //this.requestPermissions(new String[]{Manifest.permission.SEND_SMS}, 200);
             } else {
                 locationManger = (LocationManager)
                         getSystemService(Context.LOCATION_SERVICE);
@@ -50,47 +55,38 @@ public class LocationService extends Service implements LocationListener {
                         .GPS_PROVIDER, 15000, 0, this);
             }
         }
-        //Toast toast = Toast.makeText(context,"Serwis uruchomiony",Toast.LENGTH_LONG);
-        //toast.show();
         super.onCreate();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        //Log.e("onstart","intent: " + intent);
         if (intent != null) {
             Bundle extra = intent.getExtras();
             if (extra != null) {
                 String rozkaz = extra.getString("rozkaz");
-                //Log.e("onstart","rozkaz: "+ rozkaz);
-                wykonaj(rozkaz, intent);
+                try {
+                    wykonaj(rozkaz, intent);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             } else {
-                //Log.e("onstart","rozkaz jest null");
             }
         } else {
-            //Log.e("onstart","intent jest null ");
         }
         return super.onStartCommand(intent, flags, startId);
     }
 
-    public void wykonaj(String rozkaz, Intent intent) {
-        switch (rozkaz) {
-            case "wyslij":
-                String nadawca = intent.getStringExtra("nadawca");
+    public void wykonaj(String rozkaz, Intent intent) throws IOException {
+        String dostwiad = intent.getStringExtra("wiadomosc");
+        String nadawca = intent.getStringExtra("nadawca");
+        switch (dostwiad) {
+            case "Gdzie jestes?":
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    //Log.e("service", "sprawdzam uprawnienia");
                     if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                        //Log.e("service", "żądam uprawnienien loc");
                         Intent permissionintent = new Intent(context,MainActivity.class);
                         permissionintent.putExtra("uprawnienia","location");
                         startActivity(permissionintent);
-                        //this.requestPermissions(new String[]{Manifest.permission.SEND_SMS}, 200);
                     } else {
-                        //Log.e("service", "mam uprawnienienia location - wysylam");
-
-                        //SmsManager smsManager = SmsManager.getDefault();
-                        //ArrayList<String> wiadomosci = smsManager.divideMessage(wiadomosc);
-                        //smsManager.sendMultipartTextMessage(adresat, null, wiadomosci, null, null);
                         location = locationManger
                                 .getLastKnownLocation(LocationManager.GPS_PROVIDER);
                         if (location != null) {
@@ -112,68 +108,140 @@ public class LocationService extends Service implements LocationListener {
                         wiadomosc += String.valueOf(godziny) + " godzin " + String.valueOf(minuty) + " minut " + String.valueOf(sekundy) + " sekund.";
                         wiadomosc += "\nLink do Google Maps:\n";
                         wiadomosc += "\nhttps://www.google.pl/maps/?q=" + String.valueOf(latitude) + "," + String.valueOf(longtitude);
-                        //nadawca = nadawca.substring(3)
-                        //Toast toast = Toast.makeText(context,"Wykonuje wyslij.\n" +  wiadomosc ,Toast.LENGTH_LONG);
-                        //toast.show();
-                        wyslijSms(nadawca, wiadomosc);
+                        wyslijSmsData(nadawca, wiadomosc);
                     }
                 }
-//                location = locationManger
-//                        .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-//                if (location != null) {
-//                    latitude = location.getLatitude();
-//                    longtitude = location.getLongitude();
-//                    time = location.getTime();
-//                    dokl = location.getAccuracy();
-//                    curtime = System.currentTimeMillis();
-//                }
-//                long czas = (curtime - time)/1000;
-//                long godziny = czas/3600;
-//                long minuty = (czas % 3600) / 60;
-//                long sekundy = (czas % 3600) % 60;
-//                String wiadomosc = "Moja lokalizacja:\n";
-//                wiadomosc +=   "dlugość geograficzna  : " + String.valueOf(longtitude);
-//                wiadomosc += "\nszerokość geograficzna: " + String.valueOf(latitude);
-//                wiadomosc += "\ndokładność: " + String.valueOf(dokl) + " m";
-//                wiadomosc += "\ndane z przed  : ";
-//                wiadomosc += String.valueOf(godziny) + " godzin " + String.valueOf(minuty) + " minut " + String.valueOf(sekundy) + " sekund.";
-//                wiadomosc += "\nLink do Google Maps:\n";
-//                wiadomosc += "\nhttps://www.google.pl/maps/?q=" + String.valueOf(latitude) + "," + String.valueOf(longtitude);
-//                //nadawca = nadawca.substring(3)
-//
-//                Toast toast = Toast.makeText(context,"Wykonuje wyslij.\n" +  wiadomosc ,Toast.LENGTH_LONG);
-//                toast.show();
-//                wyslijSms(nadawca, wiadomosc);
                 break;
+            case "Zadzwon":
+                new Timer().schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        try {
+                            Log.e("timer", "zamykam");
+                            Runtime.getRuntime().exec(new String[] {"su", "-c", "input keyevent 26"});
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, 2000);
+                Intent callintent = new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + nadawca));
+                callintent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(callintent);
+                break;
+            case "Ustawienia":
+                Log.e("Ustawienia", "zaczynam.");
+                try {
+                    Process p = Runtime.getRuntime().exec(new String[] {"su","-c","settings get global",
+                    "wifi_on", "&&", "settings get global mobile_data","&&",
+                    "settings get secure location_providers_allowed"});
+                    Log.e("Ustawienia", "po exec.");
+
+                    BufferedReader stdInput = new BufferedReader(new
+                            InputStreamReader(p.getInputStream()));
+                    p.getErrorStream().close();
+                    Log.e("Ustawienia", "czytam.");
+
+                    String s = null;
+                    s= stdInput.readLine();
+                    String wifi = s;
+                    Log.e("wifi", wifi);
+
+                    s= stdInput.readLine();
+                    String siec = s;
+                    Log.e("Siec", siec);
+
+                    s= stdInput.readLine();
+                    String gps = s;
+                    Log.e("GPS", gps);
+
+                    p.getInputStream().close();
+                    String wiadomosc = "Stan WiFi: ";
+                    if(wifi.equals("1"))
+                        wiadomosc += "on\n";
+                    else
+                        wiadomosc += "off\n";
+                    wiadomosc += "Stan Sieci: ";
+                    if(siec.equals("1"))
+                        wiadomosc += "on\n";
+                    else
+                        wiadomosc += "off\n";
+                    wiadomosc += "Stan GPS: ";
+                    if(gps.equals("gps"))
+                        wiadomosc += "on\n";
+                    else
+                        wiadomosc += "off\n";
+                    wyslijSmsData(nadawca, wiadomosc);
+
+                } catch (Exception e){
+                    e.printStackTrace();
+                }
         }
     }
 
     public void wyslijSms(String adresat, String wiadomosc){
-        //String adres = adresat;
-        //Log.e("wyslijSms", "wysyłam wiadomosc: " + adresat + "\n" + wiadomosc);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            //Log.e("service wyslij", "sprawdzam uprawnienia sms");
             if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                //Log.e("service wyslij", "żądam uprawnienien sms");
                 Intent intent = new Intent(context,MainActivity.class);
                 intent.putExtra("uprawnienia","sms");
                 startActivity(intent);
-                //this.requestPermissions(new String[]{Manifest.permission.SEND_SMS}, 200);
             } else {
-                //Log.e("service", "mam uprawnienienia sms- wysylam");
                 SmsManager smsManager = SmsManager.getDefault();
                 ArrayList<String> wiadomosci = smsManager.divideMessage(wiadomosc);
                 smsManager.sendMultipartTextMessage(adresat, null, wiadomosci, null, null);
             }
         }
-        //SmsManager smsManager = SmsManager.getDefault();
-        //smsManager.sendTextMessage("+48604442591", null, wiadomosc, null, null);
-        //Log.e("wyslijSms", "wiadomosc powinna byc wyslana.");
+    }
+
+    public void wyslijSmsData(String adresat, String wiadomosc) throws IOException {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                Intent intent = new Intent(context,MainActivity.class);
+                intent.putExtra("uprawnienia","sms");
+                startActivity(intent);
+            } else {
+                sendEncryptedMessage(wiadomosc, adresat);
+            }
+        }
+    }
+
+    private void sendEncryptedMessage(String plainMessage, String adresat) throws IOException {
+
+        Integer PDU_SIZE = 130;
+        short port = 6544;
+        byte[] messageSerialized = plainMessage.getBytes();
+        SmsManager smsManager = SmsManager.getDefault();
+        byte[] preparedMessage = new byte[messageSerialized.length + 1];
+        preparedMessage[0] = 1;
+        System.arraycopy(messageSerialized, 0, preparedMessage, 1, messageSerialized.length);
+        if (preparedMessage.length > PDU_SIZE) {
+            Boolean equalChunks;
+            Integer mLength = preparedMessage.length;
+            Integer numOfChunks = mLength / PDU_SIZE;
+            if (mLength % PDU_SIZE == 0) {
+                preparedMessage[0] = numOfChunks.byteValue();
+                equalChunks = true;
+            } else {
+                Integer tmpChunks = numOfChunks + 1;
+                preparedMessage[0] = tmpChunks.byteValue();
+                equalChunks = false;
+            }
+            for (int i = 0; i < numOfChunks; i++) {
+                byte[] chunkArray = Arrays.copyOfRange(preparedMessage, i * PDU_SIZE, (i + 1) * PDU_SIZE);
+                smsManager.sendDataMessage(adresat, null, port, chunkArray, null, null); //todo: dodać jeszcze PendingDeliveryIntent
+                Log.e("send data", "wysyłam nr " + i + " do " + adresat + " na " + port+ "[0]: " + chunkArray[0]);
+            }
+            if (!equalChunks) {
+                byte[] chunkArray = Arrays.copyOfRange(preparedMessage, numOfChunks * PDU_SIZE, mLength);
+                smsManager.sendDataMessage(adresat, null, port, chunkArray, null, null); //todo: dodać jeszcze PendingDeliveryIntent
+                Log.e("send data", "wysyłam bez nru " + " do " + adresat + " na " + port);
+            }
+        } else {
+            smsManager.sendDataMessage(adresat, null, port, preparedMessage, null, null); //todo: dodać jeszcze PendingDeliveryIntent
+        }
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
